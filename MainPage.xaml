@@ -1,0 +1,99 @@
+﻿<Page
+    x:Class="Chatty.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    mc:Ignorable="d">
+
+	<Page.Resources>
+		<AcrylicBrush x:Key="CustomAcrylicBackgroundBrush" BackgroundSource="HostBackdrop"
+        TintOpacity="0" TintColor="#FF000000" FallbackColor="#FF000000" />
+	</Page.Resources>
+
+	<Grid Name="rootGrid" Background="{ThemeResource CustomAcrylicBackgroundBrush}">
+		<ContentDialog x:Name="joinGrpDialog"
+			Title="Create / Join Group"
+			PrimaryButtonText="Continue"
+			CloseButtonText="Cancel"
+			DefaultButton="Primary">
+
+			<Pivot>
+				<PivotItem Header="Create">
+					<StackPanel>
+						<TextBox Header="Group name" Name="newGrpName"/>
+						<TextBox Header="Group description" Name="newGrpDesc"/>
+					</StackPanel>
+				</PivotItem>
+				<PivotItem Header="Join">
+					<TextBox Header="6-Digit group code" Name="joinGrpCode"/>
+				</PivotItem>
+			</Pivot>
+
+		</ContentDialog>
+
+		<muxc:NavigationView IsBackButtonVisible="Collapsed" Name="NavMain" OpenPaneLength="200" PaneTitle="Chatty" 
+							 ItemInvoked="NavigationView_ItemInvoked" Loaded="NavMain_Loaded">
+
+			<muxc:NavigationView.Header>
+				<Grid>
+					<TextBlock Text="Chatty" Foreground="White" Margin="-50,-32,0,0" FontSize="15" FontWeight="ExtraLight" HorizontalAlignment="Center"/>
+
+					<StackPanel Height="50" VerticalAlignment="Top" Margin="0,-10,0,0">
+						<TextBlock Text="Group name" Foreground="White" FontWeight="Bold" FontSize="20" />
+						<TextBlock Text="Members: " Foreground="White" FontWeight="Light" FontSize="15" />
+					</StackPanel>
+				</Grid>
+			</muxc:NavigationView.Header>
+
+			<muxc:NavigationView.Content>
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="*" />
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
+
+					<muxc:ProgressBar Name="sendMsgLoader" Grid.Row="0" IsIndeterminate="False" Visibility="Collapsed" ShowPaused="False" 
+								 ShowError="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
+
+					<ListView Name="messages" Grid.Row="0" Loaded="Messages_Loaded" VerticalAlignment="Stretch">
+						<ListView.ItemsPanel>
+							<ItemsPanelTemplate>
+								<ItemsStackPanel VerticalAlignment="Bottom"
+                        ItemsUpdatingScrollMode="KeepLastItemInView"/>
+							</ItemsPanelTemplate>
+						</ListView.ItemsPanel>
+
+						<ListView.ItemContainerStyle>
+							<Style TargetType="ListViewItem">
+								<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+								<Setter Property="IsHitTestVisible" Value="False" />
+							</Style>
+						</ListView.ItemContainerStyle>
+						<muxc:ProgressBar IsIndeterminate="True" ShowPaused="False" 
+								 ShowError="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
+					</ListView>
+
+					<TextBox AutomationProperties.Name="multi-line TextBox" Grid.Row="1" MaxLength="1000" MaxHeight="200"
+							 PlaceholderText="Type a message" TextWrapping="Wrap" KeyDown="MsgTextbox_KeyDown" Name="msgTextbox"
+							 Background="{ThemeResource CustomAcrylicBackgroundBrush}" IsSpellCheckEnabled="True">
+						<FlyoutBase.AttachedFlyout>
+							<Flyout>
+								<TextBlock Text="" Name="msgBoxFlyoutText" />
+							</Flyout>
+						</FlyoutBase.AttachedFlyout>
+					</TextBox>
+				</Grid>
+			</muxc:NavigationView.Content>
+
+			<muxc:NavigationView.PaneFooter>
+				<muxc:NavigationViewItem Content="Join Group" ToolTipService.ToolTip="Add group chat" Tapped="joinGrpClicked">
+					<muxc:NavigationViewItem.Icon>
+						<SymbolIcon Symbol="Add" x:Name="joinGrp"/>
+					</muxc:NavigationViewItem.Icon>
+				</muxc:NavigationViewItem>
+			</muxc:NavigationView.PaneFooter>
+		</muxc:NavigationView>
+	</Grid>
+</Page>

@@ -48,6 +48,15 @@
 
 		</ContentDialog>
 
+        <ContentDialog x:Name="updatePrompt"
+			CloseButtonText="Ok"
+			DefaultButton="Close"
+            Title="Update Chatty">
+
+            <TextBlock Name="updateText" />
+
+        </ContentDialog>
+
         <ContentDialog x:Name="generalDialog"
 			PrimaryButtonText="Verify"
 			CloseButtonText="Cancel"
@@ -65,9 +74,11 @@
 
 			<muxc:NavigationView.Header>
 				<Grid>
-					<TextBlock Text="Chatty" Foreground="White" Margin="-50,-32,0,0" FontSize="15" FontWeight="ExtraLight" HorizontalAlignment="Center"/>
+                    <StackPanel Background="#3300cc6a" Margin="-50,-93,0,0" Height="32" Name="topTitleBar">
+                        <TextBlock Text="Chatty" Name="titleBarText" Foreground="White" FontSize="15" Margin="0,4,0,0" FontWeight="ExtraLight" HorizontalAlignment="Center"/>
+                    </StackPanel>
 
-					<StackPanel Height="50" VerticalAlignment="Top" Margin="0,-10,0,0" Name="grpHeader" Tapped="grpHeader_Tapped">
+                    <StackPanel Height="50" VerticalAlignment="Top" Name="grpHeader" Tapped="grpHeader_Tapped">
 						<TextBlock Text="No Group Selected" Foreground="White" FontWeight="Bold" FontSize="20" Name="grpName" />
 						<TextBlock Text="Click for group invite code" Foreground="White" FontWeight="Light" FontSize="15" />
 
@@ -94,7 +105,7 @@
 						<RowDefinition Height="Auto"/>
 					</Grid.RowDefinitions>
 
-                    <muxc:ProgressBar Name="sendMsgLoader" Grid.Row="0" IsIndeterminate="False" Visibility="Collapsed" ShowPaused="False" 
+                    <muxc:ProgressBar Name="sendLoading" Grid.Row="0" IsIndeterminate="False" Visibility="Collapsed" ShowPaused="False" 
 								 ShowError="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
 
 					<ListView Name="messages" Grid.Row="0" Loaded="Messages_Loaded" VerticalAlignment="Stretch">

@@ -1,4 +1,33 @@
-﻿using System;
+﻿/*
+ * Just in case people come and look at this in the year 2050...
+ * 
+ * Written by Vincent Kwok (CryptoAlgo) in 2020
+ * (c) 2020-2020 
+ * 
+ * Chatty is distributed under the terms of the GNU General Public License Version 3.
+ * 
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   any later version.
+ *  
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *  
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * 
+ * CryptoAlgo Inc., hereby disclaims all copyright interest in the program “Chatty” 
+ * (which allows secure online communication between 2 or more people) written by Vincent Kwok.
+ * 
+ * Vincent Kwok, 26 September 2020
+ * Owner of CryptoAlgo
+ */
+
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,11 +63,11 @@ using Windows.Security.Cryptography;
 using Windows.Security.Cryptography.Core;
 using Windows.Storage.Streams;
 using System.Security.Cryptography;
-using MyToolkit.Multimedia;
 using yt=YouTubeSearch;
 using System.Text.RegularExpressions;
-using Windows.Media.Capture.Frames;
-using Firebase.Database.Streaming;
+using Chatty;
+using Windows.Networking.Connectivity;
+using System.Net.NetworkInformation;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -54,12 +83,17 @@ namespace Firebase.ConsoleChat
     {
         public string EncryptedAES { get; set; }
         public string GrpName { get; set; }
+        public string GrpUUID { get; set; }
+    }
+
+    public class UpdateChecker
+    {
+        public string currentVer { get; set; }
     }
 
     public class MessageBase
     {
         public string Author { get; set; }
-
         public string Content { get; set; }
     }
 
@@ -89,10 +123,6 @@ namespace Firebase.ConsoleChat
 
 namespace Chatty
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
-    /// 
 
     public sealed partial class MainPage : Page
     {
@@ -191,25 +221,148 @@ namespace Chatty
             }
         }
 
+        bool registeredNetworkStatusNotif = false;
+
+        private async void ShowTitleBarText(string text, byte r, byte g, byte b)
+        {
+            await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                titleBarText.Text = text;
+                Task.Delay(4000);
+                titleBarText.Text = "Chatty - " + text;
+                topTitleBar.Background = new SolidColorBrush(Color.FromArgb(50, r, g, b));
+            });
+        }
+
+        private async void ShowUpdatePrompt(string infoText, bool disableMsgBox)
+        {
+            await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                updatePrompt.Hide();
+                if (disableMsgBox) msgTextbox.IsEnabled = false;
+                else msgTextbox.IsEnabled = true;
+                updateText.Text = infoText;
+                var result = updatePrompt.ShowAsync();
+            });
+        }
+
+        private async void UpdateVerChecker(string newVer)
+        {
+            var versionCode = newVer.Split('.'); // MainVer = 0, SubVer = 1, MinorVer = 2 (0.0.0)
+            int[] currentVer = { 0, 6, 8 }; // CHANGE THIS!!!
+
+            if (int.Parse(versionCode[0]) > currentVer[0])
+            {
+                // Kill apps
+                ShowUpdatePrompt("This version of Chatty (" + string.Join('.', currentVer) + ") is obselete." + Environment.NewLine + 
+                    "Sending of messages has been disabled." + Environment.NewLine + "Please update to the latest version (" + newVer + ")" + 
+                    Environment.NewLine + "to enjoy the latest Chatty features",
+                    true);
+            }
+            else if (int.Parse(versionCode[1]) - 1 > currentVer[1])
+            {
+                // Show warning
+                ShowUpdatePrompt("Please update to the latest Chatty version (" + newVer + ")" + Environment.NewLine +
+                    "This version (" + string.Join('.', currentVer) + ") will soon reach EOL" + Environment.NewLine +
+                    "When EOL is reached, no messages can be sent", false);
+            }
+            else if (int.Parse(versionCode[2]) - 2 > currentVer[2])
+            {
+                // Show info
+                ShowUpdatePrompt("A new version of Chatty is avaliable." + Environment.NewLine +
+                    "Please update soon to enjoy the latest features" + Environment.NewLine + 
+                    "and stability improvements", false);
+            }
+        }
+
         public MainPage()
         {
             this.InitializeComponent();
 
-            foreach (var singleObj in localSettings.Containers["pendingInvites"].Values)
+            rootDatabase = new FirebaseClient("https://chatty-inc.firebaseio.com/",
+                new FirebaseOptions
+                {
+                    OfflineDatabaseFactory = (t, s) => new OfflineDatabase(t, s),
+                    AuthTokenAsyncFactory = () => Task.FromResult("PJO0RNg8OciCbRgajSf2U2UKbFa6Tkno7oo3acqy")
+                });
+            childObj = rootDatabase.Child("messages");
+
+            // Self destruction feature to ensure older versions are not being used
+            rootDatabase.Child("versions").AsObservable<UpdateChecker>()
+                .Where(f => !string.IsNullOrEmpty(f.Key))
+                .Subscribe(f => UpdateVerChecker(f.Object.currentVer));
+
+            rootDatabase.Child("encryptedAESKeys").AsObservable<AcceptedInvitation>()
+                .Where(f => !string.IsNullOrEmpty(f.Key))
+                .Subscribe(f => reqJoinResp(f.Object, f.Key));
+
+            // Register for network status change notifications to change title bar color
+            var networkStatusCallback = new NetworkStatusChangedEventHandler(OnNetworkStatusChange);
+            if (!registeredNetworkStatusNotif)
             {
-                // Listen to the user's messages too
-                subscriptionMine = rootDatabase.Child("encryptedAESKeys").Child(singleObj.Value.ToString).AsObservable<AcceptedInvitation>()
-                    .Where(f => f != null)
-                    .Subscribe(f => reqJoinResp(f.Object));
+                NetworkInformation.NetworkStatusChanged += networkStatusCallback;
+                registeredNetworkStatusNotif = true;
+            }
+
+            if (NetworkInterface.GetIsNetworkAvailable())
+            {
+                ShowTitleBarText("Connected", 0, 204, 168);
+            }
+            else
+            {
+                ShowTitleBarText("No connection", 232, 17, 35);
+            }
+
+            async void OnNetworkStatusChange(object sender)
+            {
+                // get the ConnectionProfile that is currently used to connect to the Internet                
+                ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
+
+                if (InternetConnectionProfile == null)
+                {
+                    ShowTitleBarText("No connection", 232, 17, 35);
+                }
+                else
+                {
+                    ShowTitleBarText("Connected", 0, 204, 168);
+                }
             }
         }
 
 
-        private void reqJoinResp(AcceptedInvitation invitationResp)
+        private async void reqJoinResp(AcceptedInvitation invitationResp, string key)
         {
+            if (!localSettings.Containers.ContainsKey("pendingInvites")) return;
+            if (!localSettings.Containers["pendingInvites"].Values.ContainsKey(key)) return;
             if (!invitationResp.EncryptedAES.Equals("rej")) { // Invitation accepted
+                addNavGrp(invitationResp.GrpName, invitationResp.GrpUUID);
+                _ =
+                    localSettings.CreateContainer("container", Windows.Storage.ApplicationDataCreateDisposition.Always);
+                _ =
+                    localSettings.CreateContainer("keys", Windows.Storage.ApplicationDataCreateDisposition.Always);
+                _ =
+                    localSettings.CreateContainer("iv", Windows.Storage.ApplicationDataCreateDisposition.Always);
 
+                // Get the object back from the stream
+                var privKey = (RSAParameters)new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters)).Deserialize(new System.IO.StringReader(localSettings.Values["RSAPrivate"].ToString()));
+
+                var bytesCypherText = Convert.FromBase64String(invitationResp.EncryptedAES);
+                var csp = new RSACryptoServiceProvider();
+                csp.ImportParameters(privKey);
+
+                // Get back original encrypted text
+                var plainTextData = System.Text.Encoding.Unicode.GetString(csp.Decrypt(bytesCypherText, false));
+
+                var aesKeys = plainTextData.Split(',');
+
+                await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    localSettings.Containers["container"].Values[invitationResp.GrpUUID] = invitationResp.GrpName;
+                    localSettings.Containers["keys"].Values[invitationResp.GrpUUID] = aesKeys[0];
+                    localSettings.Containers["iv"].Values[invitationResp.GrpUUID] = aesKeys[1];
+                });
             }
+            localSettings.Containers["pendingInvites"].Values.Remove(key); // Delete waiting key from localSettings
         }
 
 
@@ -219,6 +372,7 @@ namespace Chatty
             Windows.Data.Xml.Dom.XmlDocument toastXml = ToastNotificationManager.GetTemplateContent(ToastTemplateType.ToastText02);
             Windows.Data.Xml.Dom.XmlNodeList toastNodeList = toastXml.GetElementsByTagName("text");
             toastNodeList.Item(0).AppendChild(toastXml.CreateTextNode(title));
+
             toastNodeList.Item(1).AppendChild(toastXml.CreateTextNode(stringContent));
             Windows.Data.Xml.Dom.IXmlNode toastNode = toastXml.SelectSingleNode("/toast");
             Windows.Data.Xml.Dom.XmlElement audio = toastXml.CreateElement("audio");
@@ -233,26 +387,42 @@ namespace Chatty
         {
             if (show)
             {
-                sendMsgLoader.IsIndeterminate = true;
-                sendMsgLoader.Visibility = Visibility.Visible;
+                sendLoading.IsIndeterminate = true;
+                sendLoading.Visibility = Visibility.Visible;
             }
             else
             {
-                sendMsgLoader.IsIndeterminate = false;
-                sendMsgLoader.Visibility = Visibility.Collapsed;
+                sendLoading.IsIndeterminate = false;
+                sendLoading.Visibility = Visibility.Collapsed;
             }
         }
 
         DateTime messageLastSent = DateTime.UtcNow;
+
+        string prevMsg = "";
 
         private async void MsgTextbox_KeyDown(object sender, KeyRoutedEventArgs e)
         {
             if (e.Key.Equals(Windows.System.VirtualKey.Enter))
             {
                 var msg = msgTextbox.Text;
-                if (messageLastSent.AddMilliseconds((1024 - msg.Length) * 1.25) > DateTime.UtcNow)
+                if (msg.Contains(prevMsg))
                 {
-                    suspicion += msg.Length / 100;
+                    suspicion += 10;
+                }
+
+                prevMsg = msg;
+
+                if (messageLastSent.AddMilliseconds(Math.Abs(msg.Length-20) * 200) > DateTime.UtcNow)
+                {
+                    if (msg.Length < 5)
+                    {
+                        suspicion += Math.Abs(msg.Length - 5);
+                    }
+                    else
+                    {
+                        suspicion += msg.Length / 100;
+                    }
                 }
                 messageLastSent = DateTime.UtcNow;
 
@@ -262,7 +432,6 @@ namespace Chatty
                     FlyoutBase.ShowAttachedFlyout(msgTextbox);
                     return;
                 }
-                ShowToastNotification("chars posted in min: ", charsPostedInMin.ToString());
                 charsPostedInMin += msg.Length + 5; // Penalty for short messages
                 if (charsPostedInMin > 5000)
                 {
@@ -275,7 +444,7 @@ namespace Chatty
                     for (int i = 0; i < brokeRulesTimes * 10; i++)
                     {
                         msgTextbox.Header = (brokeRulesTimes * 10 - i).ToString() + " seconds left";
-                        // await Task.Delay(1000); // I don't want to wait the whole day to text my app
+                        await Task.Delay(1000); // I don't want to wait the whole day to text my app
                     }
 
                     msgTextbox.Header = null;
@@ -286,13 +455,21 @@ namespace Chatty
                 else
                 {
                     ShowHideLoader();
-                    msgTextbox.Text = ""; // Clear messagebox
-                    await childObj.Child(selectedGrpTag).PostAsync(new OutboundMessage
+                    try
                     {
-                        Author = uuid,
-                        Content =
-                        EncryptMsg(msg, localSettings.Containers["keys"].Values[selectedGrpTag].ToString(), localSettings.Containers["iv"].Values[selectedGrpTag].ToString())
-                    });
+                        await childObj.Child(selectedGrpTag).PostAsync(new OutboundMessage
+                        {
+                            Author = uuid,
+                            Content =
+                            EncryptMsg(msg, localSettings.Containers["keys"].Values[selectedGrpTag].ToString(), localSettings.Containers["iv"].Values[selectedGrpTag].ToString())
+                        });
+                        msgTextbox.Text = ""; // Clear messagebox
+                    }
+                    catch (Firebase.Database.FirebaseException)
+                    {
+                        msgBoxFlyoutText.Text = "Failed to send message" + Environment.NewLine + "Please check your network connection";
+                        FlyoutBase.ShowAttachedFlyout(msgTextbox);
+                    }
                     ShowHideLoader(false);
                 }
 
@@ -383,16 +560,10 @@ namespace Chatty
         }
 
         bool reloadedListOnce = false;
+        private object sendMsgLoader;
 
         private void Messages_Loaded(object sender, RoutedEventArgs e)
         {
-            rootDatabase = new FirebaseClient("https://chatty-inc.firebaseio.com/",
-                new FirebaseOptions
-                {
-                    OfflineDatabaseFactory = (t, s) => new OfflineDatabase(t, s),
-                    AuthTokenAsyncFactory = () => Task.FromResult("mtir9VpHBO8sts4gDM8HKsWkna6mwGaKs0GJavnu")
-                });
-            childObj = rootDatabase.Child("messages");
             //var observableDatabase = childObj.AsRealtimeDatabase<InboundMessage>("", "", StreamingOptions.LatestOnly, InitialPullStrategy.Everything, true)
             //    .AsObservable();
 
@@ -403,35 +574,10 @@ namespace Chatty
             }
         }
 
-        private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
         private async void AddListInvite(string rawInput)
         {
-            var arrayParams = rawInput.Split(',');
-            string rsaPublicKey = arrayParams[0];
-            string cypherText = null;
-            try
-            {
-                // Get the object back from seriallized string
-                var pubKey = (RSAParameters)new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters)).Deserialize(new StringReader(rsaPublicKey));
-
-                // Another one for isolation from prev instances
-                var csp = new RSACryptoServiceProvider();
-                csp.ImportParameters(pubKey);
-                // Pad and encrypt data to Base64 for transmission
-                cypherText = Convert.ToBase64String(csp.Encrypt(System.Text.Encoding.Unicode
-                    .GetBytes(localSettings.Containers["keys"].Values[selectedGrpTag].ToString() + "," + localSettings.Containers["iv"].Values[selectedGrpTag].ToString())
-                    , false));
-            }
-            catch
-            {
-                // TODO: Show error message
-                return;
-            }
-
             await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
-                rootDatabase.Child("encryptedAESKeys").Child(arrayParams[1]).PutAsync(new AcceptedInvitation { EncryptedAES = cypherText, GrpName = grpName.Text });
                 if (!hasClearedOnce)
                 {
                     messages.Items.Clear();
@@ -463,15 +609,17 @@ namespace Chatty
                 {
                     Content = "Accept Request",
                     Style = (Style)Resources["AccentButtonStyle"],
-                    Tag = rsaPublicKey,
+                    Tag = rawInput,
                     Margin = new Thickness(4, 0, 4, 0)
                 };
+                acceptInvite.Click += AcceptButton_Click;
                 Button rejectInvite = new Button
                 {
                     Content = "Deny Request",
-                    Tag = rsaPublicKey,
+                    Tag = rawInput,
                     Margin = new Thickness(4, 0, 4, 0)
                 };
+                rejectInvite.Click += RejectInvite_Click;
 
                 buttonHolder.Children.Add(acceptInvite);
                 buttonHolder.Children.Add(rejectInvite);
@@ -479,6 +627,66 @@ namespace Chatty
                 inviteHolder.Children.Add(buttonHolder);
                 item.Content = inviteHolder;
                 messages.Items.Add(item);
+            });
+        }
+
+        private async void deleteChildren(string childTag)
+        {
+            await rootDatabase.Child("encryptedAESKeys").Child(childTag).DeleteAsync();
+        }
+
+        private async void RejectInvite_Click(object sender, RoutedEventArgs e)
+        {
+            var rejectButton = (Button)sender;
+            var arrayParams = rejectButton.Tag.ToString().Split(',');
+            await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                rootDatabase.Child("encryptedAESKeys").Child(arrayParams[1])
+                .PutAsync(new AcceptedInvitation
+                {
+                    EncryptedAES = "rej", // Rejected request
+                    GrpName = grpName.Text,
+                    GrpUUID = selectedGrpTag
+                });
+            });
+
+
+        }
+
+        private async void AcceptButton_Click(object sender, RoutedEventArgs e)
+        {
+            var acceptedButton = (Button)sender;
+            var arrayParams = acceptedButton.Tag.ToString().Split(',');
+            string rsaPublicKey = arrayParams[0];
+            string cypherText = null;
+            try
+            {
+                // Get the object back from seriallized string
+                var pubKey = (RSAParameters)new System.Xml.Serialization.XmlSerializer(typeof(RSAParameters)).Deserialize(new StringReader(rsaPublicKey));
+
+                // Another one for isolation from prev instances
+                var csp = new RSACryptoServiceProvider();
+                csp.ImportParameters(pubKey);
+                // Pad and encrypt data to Base64 for transmission
+                cypherText = Convert.ToBase64String(csp.Encrypt(System.Text.Encoding.Unicode
+                    .GetBytes(localSettings.Containers["keys"].Values[selectedGrpTag].ToString() + "," + localSettings.Containers["iv"].Values[selectedGrpTag].ToString())
+                    , false));
+            }
+            catch
+            {
+                // TODO: Show error message
+                return;
+            }
+
+            await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                rootDatabase.Child("encryptedAESKeys").Child(arrayParams[1])
+                .PutAsync(new AcceptedInvitation
+                {
+                    EncryptedAES = cypherText,
+                    GrpName = grpName.Text,
+                    GrpUUID = selectedGrpTag
+                });
             });
         }
 
@@ -587,13 +795,6 @@ namespace Chatty
                     break;
                 }
 
-                // Check if string contains URLs
-                foreach (Match matchedURL in Regex.Matches(fObject.Content, @"(http|ftp|https):\/\/([\w\-_]+(?:(?:\.[\w\-_]+)+))([\w\-\.,@?^=%&amp;:/~\+#]*[\w\-\@?^=%&amp;/~\+#])?"))
-                {
-                    Console.WriteLine(matchedURL.Value);
-                    
-                }
-
                 holder.Children.Add(usertext);
                 item.Content = holder;
                 messages.Items.Add(item);
@@ -602,6 +803,7 @@ namespace Chatty
 
         private async void NavigationView_ItemInvoked(Microsoft.UI.Xaml.Controls.NavigationView sender, Microsoft.UI.Xaml.Controls.NavigationViewItemInvokedEventArgs args)
         {
+            msgTextbox.IsEnabled = true;
             var clickItemTag = args.InvokedItemContainer.Tag;
             if (args.IsSettingsInvoked)
             {
@@ -616,6 +818,19 @@ namespace Chatty
             }
         }
 
+        private async void addNavGrp(string content, string tag)
+        {
+            await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                NavMain.MenuItems.Add(new muxc.NavigationViewItem
+                {
+                    Content = content,
+                    Icon = new SymbolIcon((Symbol)0xE716),
+                    Tag = tag
+                });
+            });
+        }
+
         private async void joinGrpClicked(object sender, TappedRoutedEventArgs e)
         {
             var result = await joinGrpDialog.ShowAsync();
@@ -625,9 +840,9 @@ namespace Chatty
                 {
                     // Create new group
                     if (!(string.IsNullOrEmpty(newGrpName.Text) || string.IsNullOrWhiteSpace(newGrpName.Text))) {
-                        Windows.Storage.ApplicationDataContainer container =
+                        _ =
                             localSettings.CreateContainer("container", Windows.Storage.ApplicationDataCreateDisposition.Always);
-                        Windows.Storage.ApplicationDataContainer keyContainer =
+                        _ =
                             localSettings.CreateContainer("keys", Windows.Storage.ApplicationDataCreateDisposition.Always);
                         _ =
                             localSettings.CreateContainer("iv", Windows.Storage.ApplicationDataCreateDisposition.Always);
@@ -636,18 +851,15 @@ namespace Chatty
                         localSettings.Containers["container"].Values[generatedGUID] = newGrpName.Text;
                         localSettings.Containers["keys"].Values[generatedGUID] = Convert.ToBase64String(aes.Key, 0, aes.Key.Length);
                         localSettings.Containers["iv"].Values[generatedGUID] = Convert.ToBase64String(aes.IV, 0, aes.IV.Length);
-                        NavMain.MenuItems.Add(new muxc.NavigationViewItem
-                        {
-                            Content = localSettings.Containers["container"].Values[generatedGUID],
-                            Icon = new SymbolIcon((Symbol)0xE716),
-                            Tag = generatedGUID
-                        });
+                        addNavGrp((string)localSettings.Containers["container"].Values[generatedGUID], generatedGUID);
                     }
                 }
                 else
                 {
                     if (joinGrpCode.Text.Length == 6)
                     {
+                        var reqGrpUUID = await rootDatabase.Child("invites")
+                            .Child(joinGrpCode.Text).OnceSingleAsync<InvitationMgmt>();
                         if (!localSettings.Values.ContainsKey("RSAPrivate"))
                         {
                             // Get new CSP
@@ -667,16 +879,15 @@ namespace Chatty
                             localSettings.Values["RSAPublic"] = publicStringWriter.ToString();
                         }
 
-                        var reqGrpUUID = await rootDatabase.Child("invites")
-                            .Child(joinGrpCode.Text).OnceSingleAsync<InvitationMgmt>();
                         if (reqGrpUUID != null)
                         {
                             await childObj.Child(reqGrpUUID.GrpUUID).PostAsync(new OutboundMessage 
-                            { Author="specialGrpRequest", 
+                            { 
+                                Author="specialGrpRequest", 
                                 Content = localSettings.Values["RSAPublic"].ToString() + "," + joinGrpCode.Text
                             });
-                            _ =
-                                localSettings.CreateContainer("pendingInvites", Windows.Storage.ApplicationDataCreateDisposition.Always);
+
+                            _ = localSettings.CreateContainer("pendingInvites", Windows.Storage.ApplicationDataCreateDisposition.Always);
                             localSettings.Containers["pendingInvites"].Values[joinGrpCode.Text] = joinGrpCode.Text;
 
                             await rootDatabase.Child("invites").Child(joinGrpCode.Text).DeleteAsync(); // Each code can only be used once
@@ -692,16 +903,26 @@ namespace Chatty
             {
                 foreach (var singleObj in localSettings.Containers["container"].Values)
                 {
-                    NavMain.MenuItems.Add(new muxc.NavigationViewItem
-                    {
-                        Content = singleObj.Value,
-                        Icon = new SymbolIcon((Symbol)0xE716),
-                        Tag = singleObj.Key
-                    });
+                    addNavGrp((string)singleObj.Value, singleObj.Key);
                 }
-                NavMain.SelectedItem = NavMain.MenuItems.ElementAt(0);
-                selectedGrpTag = localSettings.Containers["container"].Values.Keys.ToList()[0];
-                grpName.Text = localSettings.Containers["container"].Values.Values.ToList()[0].ToString();
+                if (localSettings.Containers["container"].Values.ToList().Count == 0)
+                {
+                    ListViewItem item = new ListViewItem();
+                    TextBlock message = new TextBlock
+                    {
+                        Text = "Add or create your first group by clicking on the add icon in the left menu",
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    item.Content = message;
+                    messages.Items.Add(item);
+                    msgTextbox.IsEnabled = false;
+                }
+                else
+                {
+                    // NavMain.SelectedItem = NavMain.MenuItems.ElementAt(0);
+                    selectedGrpTag = localSettings.Containers["container"].Values.Keys.ToList()[0];
+                    grpName.Text = localSettings.Containers["container"].Values.Values.ToList()[0].ToString();
+                }
             }
         }
 

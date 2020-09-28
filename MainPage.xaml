@@ -12,41 +12,41 @@
         TintOpacity="0" TintColor="#FF000000" FallbackColor="#FF000000" />
 	</Page.Resources>
 
-	<Grid Name="rootGrid" Background="{ThemeResource CustomAcrylicBackgroundBrush}">
-		<ContentDialog x:Name="joinGrpDialog"
+    <Grid Name="rootGrid" Background="{ThemeResource CustomAcrylicBackgroundBrush}">
+        <ContentDialog x:Name="joinGrpDialog"
 			PrimaryButtonText="Continue"
 			CloseButtonText="Cancel"
 			DefaultButton="Primary">
 
-			<Pivot Name="AddGrpPivot">
-				<PivotItem Header="Create">
-					<StackPanel>
-						<TextBox Header="Group name" Name="newGrpName" MaxLength="50"/>
-						<TextBox Header="Group description" Name="newGrpDesc" MaxLength="255"/>
-					</StackPanel>
-				</PivotItem>
-				<PivotItem Header="Join">
-					<TextBox Header="6-Digit group code" Name="joinGrpCode"/>
-				</PivotItem>
-			</Pivot>
+            <Pivot Name="AddGrpPivot">
+                <PivotItem Header="Create">
+                    <StackPanel>
+                        <TextBox Header="Group name" Name="newGrpName" MaxLength="50"/>
+                        <TextBox Header="Group description" Name="newGrpDesc" MaxLength="255"/>
+                    </StackPanel>
+                </PivotItem>
+                <PivotItem Header="Join">
+                    <TextBox Header="6-Digit group code" Name="joinGrpCode"/>
+                </PivotItem>
+            </Pivot>
 
-		</ContentDialog>
+        </ContentDialog>
 
-		<ContentDialog x:Name="settingsDialog"
+        <ContentDialog x:Name="settingsDialog"
 			PrimaryButtonText="Continue"
 			CloseButtonText="Cancel"
 			DefaultButton="Primary">
 
-			<Pivot>
-				<PivotItem Header="Zerui">
-					<StackPanel>
-					</StackPanel>
-				</PivotItem>
-				<PivotItem Header="Hmm">
-				</PivotItem>
-			</Pivot>
+            <Pivot>
+                <PivotItem Header="Zerui">
+                    <StackPanel>
+                    </StackPanel>
+                </PivotItem>
+                <PivotItem Header="Hmm">
+                </PivotItem>
+            </Pivot>
 
-		</ContentDialog>
+        </ContentDialog>
 
         <ContentDialog x:Name="updatePrompt"
 			CloseButtonText="Ok"
@@ -72,49 +72,49 @@
         <muxc:NavigationView IsBackButtonVisible="Collapsed" Name="NavMain" OpenPaneLength="200" PaneTitle="Chatty" 
 							 ItemInvoked="NavigationView_ItemInvoked" Loaded="NavMain_Loaded">
 
-			<muxc:NavigationView.Header>
-				<Grid>
+            <muxc:NavigationView.Header>
+                <Grid>
                     <StackPanel Background="#3300cc6a" Margin="-50,-93,0,0" Height="32" Name="topTitleBar">
                         <TextBlock Text="Chatty" Name="titleBarText" Foreground="White" FontSize="15" Margin="0,4,0,0" FontWeight="ExtraLight" HorizontalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Height="50" VerticalAlignment="Top" Name="grpHeader" Tapped="grpHeader_Tapped">
-						<TextBlock Text="No Group Selected" Foreground="White" FontWeight="Bold" FontSize="20" Name="grpName" />
-						<TextBlock Text="Click for group invite code" Foreground="White" FontWeight="Light" FontSize="15" />
+                        <TextBlock Text="No Group Selected" Foreground="White" FontWeight="Bold" FontSize="20" Name="grpName" />
+                        <TextBlock Text="Click for group invite code" Foreground="White" FontWeight="Light" FontSize="15" />
 
-						<FlyoutBase.AttachedFlyout>
-							<Flyout Closed="Flyout_Closed" Opened="Flyout_Opened">
-								<StackPanel>
-									<TextBlock Name="grpInviteFlyout" HorizontalTextAlignment="Center" Margin="0,0,0,4">
+                        <FlyoutBase.AttachedFlyout>
+                            <Flyout Closed="Flyout_Closed" Opened="Flyout_Opened">
+                                <StackPanel>
+                                    <TextBlock Name="grpInviteFlyout" HorizontalTextAlignment="Center" Margin="0,0,0,4">
 										Get an invite code that allows users to request to join your group.<LineBreak />The user can only join if the request is accepted.<LineBreak/>Each code can only be used once.
-									</TextBlock>
-									<TextBox Text="000-000" AutomationProperties.Name="customized TextBox" IsReadOnly="True" Visibility="Collapsed"
+                                    </TextBlock>
+                                    <TextBox Text="000-000" AutomationProperties.Name="customized TextBox" IsReadOnly="True" Visibility="Collapsed"
 											 FontWeight="Bold" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,8" Name="grpInviteCode" Header="Invite code:"/>
-									<Button Style="{StaticResource ButtonRevealStyle}" Content="Get invite code" HorizontalAlignment="Center" Name="getInviteCode" Click="getInviteCode_Click"/>
-								</StackPanel>
-							</Flyout>
-						</FlyoutBase.AttachedFlyout>
-					</StackPanel>
-				</Grid>
-			</muxc:NavigationView.Header>
+                                    <Button Style="{StaticResource ButtonRevealStyle}" Content="Get invite code" HorizontalAlignment="Center" Name="getInviteCode" Click="getInviteCode_Click"/>
+                                </StackPanel>
+                            </Flyout>
+                        </FlyoutBase.AttachedFlyout>
+                    </StackPanel>
+                </Grid>
+            </muxc:NavigationView.Header>
 
-			<muxc:NavigationView.Content>
-				<Grid>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="*" />
-						<RowDefinition Height="Auto"/>
-					</Grid.RowDefinitions>
+            <muxc:NavigationView.Content>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
                     <muxc:ProgressBar Name="sendLoading" Grid.Row="0" IsIndeterminate="False" Visibility="Collapsed" ShowPaused="False" 
 								 ShowError="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
 
-					<ListView Name="messages" Grid.Row="0" Loaded="Messages_Loaded" VerticalAlignment="Stretch">
-						<ListView.ItemsPanel>
-							<ItemsPanelTemplate>
-								<ItemsStackPanel VerticalAlignment="Bottom"
+                    <ListView Name="messages" Grid.Row="0" Loaded="Messages_Loaded" VerticalAlignment="Stretch">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsStackPanel VerticalAlignment="Bottom"
                         ItemsUpdatingScrollMode="KeepLastItemInView"/>
-							</ItemsPanelTemplate>
-						</ListView.ItemsPanel>
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
 
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
@@ -128,30 +128,34 @@
                                 </Setter>
                             </Style>
                         </ListView.ItemContainerStyle>
-                        
+
                         <muxc:ProgressBar IsIndeterminate="True" ShowPaused="False" 
 								 ShowError="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
                     </ListView>
 
-					<TextBox AutomationProperties.Name="multi-line TextBox" Grid.Row="1" MaxLength="512" MaxHeight="200"
+                    <TextBox AutomationProperties.Name="multi-line TextBox" Grid.Row="1" MaxLength="512" MaxHeight="200"
 							 PlaceholderText="Type a message" TextWrapping="Wrap" KeyDown="MsgTextbox_KeyDown" Name="msgTextbox"
 							 Background="{ThemeResource CustomAcrylicBackgroundBrush}" IsSpellCheckEnabled="True">
-						<FlyoutBase.AttachedFlyout>
-							<Flyout>
-								<TextBlock Text="" Name="msgBoxFlyoutText" />
-							</Flyout>
-						</FlyoutBase.AttachedFlyout>
-					</TextBox>
-				</Grid>
-			</muxc:NavigationView.Content>
+                        <FlyoutBase.AttachedFlyout>
+                            <Flyout>
+                                <TextBlock Text="" Name="msgBoxFlyoutText" />
+                            </Flyout>
+                        </FlyoutBase.AttachedFlyout>
+                    </TextBox>
+                </Grid>
+            </muxc:NavigationView.Content>
 
-			<muxc:NavigationView.PaneFooter>
-				<muxc:NavigationViewItem Content="Add Group" ToolTipService.ToolTip="Create/join group" Tapped="joinGrpClicked">
-					<muxc:NavigationViewItem.Icon>
-						<SymbolIcon Symbol="Add" x:Name="joinGrp"/>
-					</muxc:NavigationViewItem.Icon>
-				</muxc:NavigationViewItem>
-			</muxc:NavigationView.PaneFooter>
-		</muxc:NavigationView>
-	</Grid>
+            <muxc:NavigationView.PaneFooter>
+                <muxc:NavigationViewItem Content="Add Group" Name="joinGrpBtn" ToolTipService.ToolTip="Create/join group" Tapped="joinGrpClicked">
+                    <muxc:NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Add" x:Name="joinGrp"/>
+                    </muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+            </muxc:NavigationView.PaneFooter>
+        </muxc:NavigationView>
+
+        <muxc:TeachingTip Name="grpReqResult"
+            PreferredPlacement="BottomLeft">
+        </muxc:TeachingTip>
+    </Grid>
 </Page>
